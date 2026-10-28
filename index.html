@@ -976,4 +976,290 @@
   });
 
   // ---------- Ações nos cartões da lista (delegação de evento) ----------
-  el.lista.ad
+  el.lista.addEventListener("click", function(e){
+    const alvo = e.target.closest("[data-acao]");
+    if(!alvo) return;
+    const id = alvo.getAttribute("data-id");
+    const acao = alvo.getAttribute("data-acao");
+    const item = itens.find(function(i){ return i.id === id; });
+    if(!item) return;
+
+    if(acao === "marcar"){
+      item.marcado = !item.marcado;
+      salvarItens();
+      atualizarTudo();
+    }
+    if(acao === "remover"){
+      itens = itens.filter(function(i){ return i.id !== id; });
+      salvarItens();
+      atualizarTudo();
+    }
+    if(acao === "qtd-mais"){
+      item.quantidade = Math.round((item.quantidade + 1) * 100) / 100;
+      salvarItens();
+      atualizarTudo();
+    }
+    if(acao === "qtd-menos"){
+      item.quantidade = Math.max(1, Math.round((item.quantidade - 1) * 100) / 100);
+      salvarItens();
+      atualizarTudo();
+    }
+  });
+
+  el.lista.addEventListener("change", function(e){
+    const alvo = e.target;
+    const campo = alvo.getAttribute("data-campo");
+    if(!campo) return;
+    const id = alvo.getAttribute("data-id");
+    const item = itens.find(function(i){ return i.id === id; });
+    if(!item) return;
+
+    if(campo === "quantidade"){
+      const v = converterNumero(alvo.value);
+      item.quantidade = (!isNaN(v) && v > 0) ? v : item.quantidade;
+    } else if(campo === "preco"){
+      const v = converterNumero(alvo.value);
+      item.preco = (!isNaN(v) && v >= 0) ? v : item.preco;
+    } else if(campo === "observacao"){
+      item.observacao = alvo.value.trim();
+    }
+
+    salvarItens();
+    atualizarTudo();
+  });
+
+  // ---------- Orçamento ----------
+  el.orcamentoInput.addEventListener("input", function(){
+    const v = converterNumero(el.orcamentoInput.value);
+    orcamento = !isNaN(v) ? v : 0;
+    salvarOrcamento();
+    atualizarResumo();
+  });
+
+  // ---------- Busca, ordenação e filtros rápidos ----------
+  el.busca.addEventListener("input", function(){
+    textoBusca = el.busca.value;
+    renderizar();
+  });
+
+  el.ordenar.addEventListener("change", function(){
+    criterioOrdenacao = el.ordenar.value;
+    renderizar();
+  });
+
+  el.filtros.forEach(function(botao){
+    botao.addEventListener("click", function(){
+      el.filtros.forEach(function(b){ b.classList.remove("ativo"); });
+      botao.classList.add("ativo");
+      filtroAtual = botao.getAttribute("data-filtro");
+      renderizar();
+    });
+  });
+
+  // ---------- Nova lista do mês ----------
+  el.btnLimpar.addEventListener("click", function(){
+    if(itens.length === 0) return;
+    const confirmar = confirm("Isso vai apagar todos os itens da lista atual (o orçamento definido será mantido). Deseja continuar?");
+    if(confirmar){
+      itens = [];
+      salvarItens();
+      atualizarTudo();
+    }
+  });
+
+  // ---------- Lançamento inicial de produtos (roda uma única vez) ----------
+  function lancarProdutosIniciais(){
+    const CHAVE_SEED = "listaCompras_seedProdutos_v1";
+    if(localStorage.getItem(CHAVE_SEED)) return;
+
+    const produtos = [
+      "Alho","Arroz","Atum/Sardinha","Batata Frita","Berinjela","Bolacha Marilan",
+      "Caps Café","Cebola","Cebolinha","Cenoura","Coentro","Couve Flor Cong",
+      "Creme de Leite","Creme de Ricota","Danone","Detergente","Esponja",
+      "Esponja Antirisco","Extrato de Tomate","Farinha de Trigo","Filezinho Temp",
+      "Glade Refil","Leite Condensado","Leite em Pó","Macarrão","Macarrão Linguinne",
+      "Macarrão Parafuso","Macarrão Penne","Maionese Light","Manga","Molho Tare",
+      "Morango Congelado","Ovo","Papel Hig","Passarinho Temp","Pimenta Asteca",
+      "Queijo Ralado","Repolho","Requeijão","Sabao Para Casa","Salgadinho","Salmao",
+      "Seleta Cong","Tomate","Tomate Cereja","Tomate Pelado","Vassoura","Vinagre"
+    ];
+
+    const nomesExistentes = itens.map(function(i){ return i.nome.trim().toLowerCase(); });
+
+    produtos.forEach(function(nome){
+      if(nomesExistentes.indexOf(nome.toLowerCase()) === -1){
+        itens.push({ id: gerarId(), nome: nome, quantidade: 1, preco: 0, observacao: "", marcado: false });
+      }
+    });
+
+    localStorage.setItem(CHAVE_SEED, "1");
+    salvarItens();
+  }
+
+
+  // ---------- Compartilhar / receber lista ----------
+  function codificarLista(){
+    const dados = {
+      o: orcamento,
+      i: itens.map(function(i){ return [i.nome, i.quantidade, i.preco, i.observacao || "", i.marcado ? 1 : 0]; })
+    };
+    const bytes = new TextEncoder().encode(JSON.stringify(dados));
+    let bin = "";
+    bytes.forEach(function(b){ bin += String.fromCharCode(b); });
+    return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+
+  function decodificarLista(codigo){
+    let b64 = String(codigo).replace(/\s+/g, "").replace(/-/g, "+").replace(/_/g, "/");
+    while(b64.length % 4) b64 += "=";
+    const bin = atob(b64);
+    const bytes = Uint8Array.from(bin, function(c){ return c.charCodeAt(0); });
+    const dados = JSON.parse(new TextDecoder().decode(bytes));
+    if(!dados || !Array.isArray(dados.i)) throw new Error("formato inválido");
+    return {
+      orcamento: Number(dados.o) >= 0 ? Number(dados.o) : 0,
+      itens: dados.i.map(function(a){
+        let qtd = Number(a[1]); let preco = Number(a[2]);
+        if(isNaN(qtd) || qtd <= 0) qtd = 1;
+        if(isNaN(preco) || preco < 0) preco = 0;
+        return { id: gerarId(), nome: String(a[0] || ""), quantidade: qtd, preco: preco, observacao: String(a[3] || ""), marcado: a[4] === 1 };
+      })
+    };
+  }
+
+  function extrairCodigo(texto){
+    const m = String(texto).match(/[#&?]lista=([A-Za-z0-9_\-]+)/);
+    return m ? m[1] : String(texto).replace(/\s+/g, "");
+  }
+
+  function aplicarListaRecebida(recebida){
+    itens = recebida.itens;
+    orcamento = recebida.orcamento;
+    salvarItens();
+    salvarOrcamento();
+    localStorage.setItem("listaCompras_seedProdutos_v1", "1");
+    el.orcamentoInput.value = orcamento.toFixed(2).replace(".", ",");
+    atualizarTudo();
+  }
+
+  function pedirConfirmacaoEImportar(recebida){
+    const msg = "Você recebeu uma lista com " + recebida.itens.length + " itens.\n\nIsso vai SUBSTITUIR a sua lista atual (" + itens.length + " itens). Deseja continuar?";
+    if(confirm(msg)){
+      aplicarListaRecebida(recebida);
+      return true;
+    }
+    return false;
+  }
+
+  function linkDaLista(){
+    const codigo = codificarLista();
+    if(location.protocol === "http:" || location.protocol === "https:"){
+      return { tipo: "link", texto: location.href.split("#")[0] + "#lista=" + codigo };
+    }
+    return { tipo: "codigo", texto: codigo };
+  }
+
+  function copiarTexto(texto){
+    if(navigator.clipboard && window.isSecureContext){
+      return navigator.clipboard.writeText(texto).then(function(){ return true; }, function(){ return copiarFallback(texto); });
+    }
+    return Promise.resolve(copiarFallback(texto));
+  }
+
+  function copiarFallback(texto){
+    const ta = document.createElement("textarea");
+    ta.value = texto;
+    ta.style.position = "fixed"; ta.style.opacity = "0"; ta.style.fontSize = "16px";
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    let ok = false;
+    try{ ok = document.execCommand("copy"); }catch(e){ ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+  }
+
+  const modalFundo = document.getElementById("modalFundo");
+  const avisoCopiado = document.getElementById("avisoCopiado");
+  const erroImportar = document.getElementById("erroImportar");
+  const campoImportar = document.getElementById("campoImportar");
+
+  function abrirModal(){
+    const info = linkDaLista();
+    document.getElementById("ajudaEnvio").textContent = info.tipo === "link"
+      ? "Envia uma cópia da sua lista atual. Quem abrir o link poderá substituir a própria lista por esta."
+      : "Este arquivo está aberto direto do computador, então o envio vai como código. Para enviar como link, publique o site (ex: GitHub Pages).";
+    document.getElementById("btnCopiar").textContent = info.tipo === "link" ? "Copiar link" : "Copiar código";
+    avisoCopiado.textContent = "";
+    erroImportar.textContent = "";
+    campoImportar.value = "";
+    modalFundo.classList.add("aberto");
+    document.body.classList.add("modal-aberto");
+  }
+
+  function fecharModal(){
+    modalFundo.classList.remove("aberto");
+    document.body.classList.remove("modal-aberto");
+  }
+
+  document.getElementById("btnCompartilhar").addEventListener("click", abrirModal);
+  document.getElementById("btnFecharModal").addEventListener("click", fecharModal);
+  modalFundo.addEventListener("click", function(e){ if(e.target === modalFundo) fecharModal(); });
+  document.addEventListener("keydown", function(e){ if(e.key === "Escape") fecharModal(); });
+
+  document.getElementById("btnWhats").addEventListener("click", function(){
+    const info = linkDaLista();
+    const texto = info.tipo === "link"
+      ? "🛒 Minha lista de compras atualizada:\n" + info.texto
+      : "🛒 Minha lista de compras (código para importar):\n" + info.texto;
+    window.open("https://wa.me/?text=" + encodeURIComponent(texto), "_blank");
+  });
+
+  document.getElementById("btnCopiar").addEventListener("click", function(){
+    const info = linkDaLista();
+    Promise.resolve(copiarTexto(info.texto)).then(function(ok){
+      avisoCopiado.className = "modal-aviso" + (ok ? "" : " erro");
+      avisoCopiado.textContent = ok ? (info.tipo === "link" ? "Link copiado!" : "Código copiado!") : "Não consegui copiar. Tente de novo.";
+    });
+  });
+
+  document.getElementById("btnImportar").addEventListener("click", function(){
+    erroImportar.textContent = "";
+    const texto = campoImportar.value.trim();
+    if(!texto){ erroImportar.textContent = "Cole o link ou código primeiro."; return; }
+    let recebida;
+    try{
+      recebida = decodificarLista(extrairCodigo(texto));
+    }catch(e){
+      erroImportar.textContent = "Esse link ou código não é válido.";
+      return;
+    }
+    if(pedirConfirmacaoEImportar(recebida)) fecharModal();
+  });
+
+  // Se a página foi aberta por um link de lista compartilhada, oferece importar
+  function verificarListaNoLink(){
+    const m = location.hash.match(/^#lista=([A-Za-z0-9_\-]+)$/);
+    if(!m) return false;
+    try{
+      const recebida = decodificarLista(m[1]);
+      history.replaceState(null, "", location.pathname + location.search);
+      localStorage.setItem("listaCompras_seedProdutos_v1", "1");
+      pedirConfirmacaoEImportar(recebida);
+    }catch(e){
+      history.replaceState(null, "", location.pathname + location.search);
+      alert("O link da lista parece estar incompleto ou inválido.");
+    }
+    return true;
+  }
+
+  // inicialização
+  if(!/^#lista=/.test(location.hash)) lancarProdutosIniciais();
+  el.orcamentoInput.value = orcamento.toFixed(2).replace(".", ",");
+  atualizarTudo();
+  verificarListaNoLink();
+
+})();
+</script>
+
+</body>
+</html>
