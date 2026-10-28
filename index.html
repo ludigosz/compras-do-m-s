@@ -427,6 +427,76 @@
     .painel-item .rotulo{ font-size: 11px; }
   }
 
+
+  /* ===================== COMPARTILHAR ===================== */
+  .btn-compartilhar{
+    margin-left: auto;
+    display: flex; align-items: center; gap: 7px;
+    min-height: 40px;
+    padding: 0 16px;
+    border-radius: 999px;
+    border: 1px solid var(--verde-medio);
+    background: var(--papel);
+    color: var(--verde-escuro);
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    box-shadow: var(--sombra-leve);
+    touch-action: manipulation;
+  }
+  .btn-compartilhar:active{ background: var(--verde-claro); }
+  .btn-compartilhar svg{ width: 16px; height: 16px; }
+
+  .modal-fundo{
+    position: fixed; inset: 0;
+    background: rgba(40,50,42,0.45);
+    display: none;
+    align-items: flex-end; justify-content: center;
+    z-index: 100;
+  }
+  .modal-fundo.aberto{ display: flex; }
+  .modal{
+    background: var(--papel);
+    width: 100%; max-width: 520px;
+    max-height: 92vh; overflow-y: auto;
+    border-radius: 20px 20px 0 0;
+    padding: 18px 18px 26px;
+  }
+  .modal-topo{ display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .modal-topo h2{ font-size: 18px; margin: 0; color: #3d4a3f; }
+  .modal-fechar{
+    width: 44px; height: 44px; border: none; background: transparent;
+    font-size: 30px; line-height: 1; color: var(--texto-suave); cursor: pointer;
+    touch-action: manipulation;
+  }
+  .modal-secao{ padding: 12px 0; border-top: 1px solid var(--linha); }
+  .modal-secao:first-of-type{ border-top: none; }
+  .modal-secao h3{ font-size: 15px; margin: 0 0 4px; color: #3d4a3f; }
+  .modal-ajuda{ font-size: 13px; color: var(--texto-suave); margin: 0 0 8px; line-height: 1.4; }
+  .btn-modal{
+    width: 100%; min-height: 48px; margin-top: 8px;
+    border-radius: 12px; border: 1px solid var(--verde-medio);
+    background: var(--papel); color: var(--verde-escuro);
+    font-weight: 700; font-size: 16px; cursor: pointer;
+    touch-action: manipulation;
+  }
+  .btn-modal:active{ background: var(--verde-claro); }
+  .btn-modal.primario{ background: linear-gradient(135deg, var(--verde-medio), var(--verde-escuro)); color: #fff; border: none; }
+  .modal input[type="text"]{
+    width: 100%; padding: 12px 13px; font-size: 16px;
+    border: 1px solid var(--linha); background: var(--creme);
+    border-radius: var(--raio-peq); color: var(--texto); outline: none; font-family: inherit;
+  }
+  .modal input[type="text"]:focus{ border-color: var(--verde-medio); background: #fff; }
+  .modal-aviso{ font-size: 13px; font-weight: 700; color: var(--verde-escuro); margin-top: 8px; min-height: 0; }
+  .modal-aviso.erro{ color: var(--salmao-escuro); }
+  body.modal-aberto{ overflow: hidden; }
+
+  @media (min-width: 560px){
+    .modal-fundo{ align-items: center; }
+    .modal{ border-radius: 20px; }
+  }
+
   @media (prefers-reduced-motion: reduce){ *{ transition:none !important; } }
 </style>
 </head>
@@ -533,6 +603,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
       Meus itens
     </h2>
+    <button type="button" class="btn-compartilhar" id="btnCompartilhar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg>
+      Compartilhar
+    </button>
   </div>
 
   <div class="lista-topo">
@@ -572,6 +646,32 @@
   <div class="rodape-privacidade">Todos os dados ficam salvos apenas neste navegador — nada é enviado para a internet.</div>
 
 </div>
+
+
+  <div class="modal-fundo" id="modalFundo">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitulo">
+      <div class="modal-topo">
+        <h2 id="modalTitulo">Compartilhar lista</h2>
+        <button type="button" class="modal-fechar" id="btnFecharModal" aria-label="Fechar">×</button>
+      </div>
+
+      <div class="modal-secao">
+        <h3>Enviar minha lista</h3>
+        <p class="modal-ajuda" id="ajudaEnvio"></p>
+        <button type="button" class="btn-modal primario" id="btnWhats">Enviar pelo WhatsApp</button>
+        <button type="button" class="btn-modal" id="btnCopiar">Copiar link</button>
+        <div class="modal-aviso" id="avisoCopiado"></div>
+      </div>
+
+      <div class="modal-secao">
+        <h3>Receber uma lista</h3>
+        <p class="modal-ajuda">Cole aqui o link ou código que você recebeu:</p>
+        <input type="text" id="campoImportar" placeholder="Cole o link ou código" autocomplete="off">
+        <button type="button" class="btn-modal" id="btnImportar">Importar lista</button>
+        <div class="modal-aviso erro" id="erroImportar"></div>
+      </div>
+    </div>
+  </div>
 
 <script>
 (function(){
@@ -876,133 +976,4 @@
   });
 
   // ---------- Ações nos cartões da lista (delegação de evento) ----------
-  el.lista.addEventListener("click", function(e){
-    const alvo = e.target.closest("[data-acao]");
-    if(!alvo) return;
-    const id = alvo.getAttribute("data-id");
-    const acao = alvo.getAttribute("data-acao");
-    const item = itens.find(function(i){ return i.id === id; });
-    if(!item) return;
-
-    if(acao === "marcar"){
-      item.marcado = !item.marcado;
-      salvarItens();
-      atualizarTudo();
-    }
-    if(acao === "remover"){
-      itens = itens.filter(function(i){ return i.id !== id; });
-      salvarItens();
-      atualizarTudo();
-    }
-    if(acao === "qtd-mais"){
-      item.quantidade = Math.round((item.quantidade + 1) * 100) / 100;
-      salvarItens();
-      atualizarTudo();
-    }
-    if(acao === "qtd-menos"){
-      item.quantidade = Math.max(1, Math.round((item.quantidade - 1) * 100) / 100);
-      salvarItens();
-      atualizarTudo();
-    }
-  });
-
-  el.lista.addEventListener("change", function(e){
-    const alvo = e.target;
-    const campo = alvo.getAttribute("data-campo");
-    if(!campo) return;
-    const id = alvo.getAttribute("data-id");
-    const item = itens.find(function(i){ return i.id === id; });
-    if(!item) return;
-
-    if(campo === "quantidade"){
-      const v = converterNumero(alvo.value);
-      item.quantidade = (!isNaN(v) && v > 0) ? v : item.quantidade;
-    } else if(campo === "preco"){
-      const v = converterNumero(alvo.value);
-      item.preco = (!isNaN(v) && v >= 0) ? v : item.preco;
-    } else if(campo === "observacao"){
-      item.observacao = alvo.value.trim();
-    }
-
-    salvarItens();
-    atualizarTudo();
-  });
-
-  // ---------- Orçamento ----------
-  el.orcamentoInput.addEventListener("input", function(){
-    const v = converterNumero(el.orcamentoInput.value);
-    orcamento = !isNaN(v) ? v : 0;
-    salvarOrcamento();
-    atualizarResumo();
-  });
-
-  // ---------- Busca, ordenação e filtros rápidos ----------
-  el.busca.addEventListener("input", function(){
-    textoBusca = el.busca.value;
-    renderizar();
-  });
-
-  el.ordenar.addEventListener("change", function(){
-    criterioOrdenacao = el.ordenar.value;
-    renderizar();
-  });
-
-  el.filtros.forEach(function(botao){
-    botao.addEventListener("click", function(){
-      el.filtros.forEach(function(b){ b.classList.remove("ativo"); });
-      botao.classList.add("ativo");
-      filtroAtual = botao.getAttribute("data-filtro");
-      renderizar();
-    });
-  });
-
-  // ---------- Nova lista do mês ----------
-  el.btnLimpar.addEventListener("click", function(){
-    if(itens.length === 0) return;
-    const confirmar = confirm("Isso vai apagar todos os itens da lista atual (o orçamento definido será mantido). Deseja continuar?");
-    if(confirmar){
-      itens = [];
-      salvarItens();
-      atualizarTudo();
-    }
-  });
-
-  // ---------- Lançamento inicial de produtos (roda uma única vez) ----------
-  function lancarProdutosIniciais(){
-    const CHAVE_SEED = "listaCompras_seedProdutos_v1";
-    if(localStorage.getItem(CHAVE_SEED)) return;
-
-    const produtos = [
-      "Alho","Arroz","Atum/Sardinha","Batata Frita","Berinjela","Bolacha Marilan",
-      "Caps Café","Cebola","Cebolinha","Cenoura","Coentro","Couve Flor Cong",
-      "Creme de Leite","Creme de Ricota","Danone","Detergente","Esponja",
-      "Esponja Antirisco","Extrato de Tomate","Farinha de Trigo","Filezinho Temp",
-      "Glade Refil","Leite Condensado","Leite em Pó","Macarrão","Macarrão Linguinne",
-      "Macarrão Parafuso","Macarrão Penne","Maionese Light","Manga","Molho Tare",
-      "Morango Congelado","Ovo","Papel Hig","Passarinho Temp","Pimenta Asteca",
-      "Queijo Ralado","Repolho","Requeijão","Sabao Para Casa","Salgadinho","Salmao",
-      "Seleta Cong","Tomate","Tomate Cereja","Tomate Pelado","Vassoura","Vinagre"
-    ];
-
-    const nomesExistentes = itens.map(function(i){ return i.nome.trim().toLowerCase(); });
-
-    produtos.forEach(function(nome){
-      if(nomesExistentes.indexOf(nome.toLowerCase()) === -1){
-        itens.push({ id: gerarId(), nome: nome, quantidade: 1, preco: 0, observacao: "", marcado: false });
-      }
-    });
-
-    localStorage.setItem(CHAVE_SEED, "1");
-    salvarItens();
-  }
-
-  // inicialização
-  lancarProdutosIniciais();
-  el.orcamentoInput.value = orcamento.toFixed(2).replace(".", ",");
-  atualizarTudo();
-
-})();
-</script>
-
-</body>
-</html>
+  el.lista.ad
